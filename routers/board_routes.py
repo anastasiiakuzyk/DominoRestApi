@@ -37,7 +37,7 @@ async def solve_route(board: Board, user: str = Depends(get_current_user)):
     """
     dominos = generate_dominos(find_max_pips(board.board))
     placement = [[None for _ in range(len(board.board[0]))] for _ in range(len(board.board))]
-    solved = solve_puzzle_parallel(board.board, dominos)
+    solved = solve_puzzle_parallel(board.board, dominos, 0, 0, placement)
 
     solution_str = "Domino Board:\n"
     solution_str += print_board_with_solution(board.board, placement, False)

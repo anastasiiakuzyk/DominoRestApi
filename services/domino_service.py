@@ -107,20 +107,44 @@ def solve_puzzle(board: List[List[int]], dominos: List[Domino], x: int = 0, y: i
     return False
 
 
-def solve_puzzle_parallel(board: List[List[int]], dominos: List[Domino]) -> bool:
-    rows, cols = len(board), len(board[0])
-    placement = [[None for _ in range(cols)] for _ in range(rows)]
-    solution_found = [False]
+def solve_puzzle_parallel(board: List[List[int]], dominos: List[Domino], x: int = 0, y: int = 0, placement: Optional[List[List[Optional[int]]]] = None) -> bool:
+    if placement is None:
+        placement = [[None for _ in range(len(board[0]))] for _ in range(len(board))]
 
-    def worker(x: int, y: int) -> bool:
-        return solve_puzzle(board, dominos, x, y, placement)
+    if y >= len(board[0]):
+        x, y = x + 1, 0
+    if x >= len(board):
+        return True
+    if placement[x][y] is not None:
+        return solve_puzzle_parallel(board, dominos, x, y + 1, placement)
+
+    def try_place(domino, x, y, horizontal):
+        local_placement = [row[:] for row in placement]
+        if horizontal:
+            local_placement[x][y], local_placement[x][y + 1] = domino.side1, domino.side2
+            result = solve_puzzle_parallel(board, dominos, x, y + 2, local_placement)
+        else:
+            local_placement[x][y], local_placement[x + 1][y] = domino.side1, domino.side2
+            result = solve_puzzle_parallel(board, dominos, x, y + 1, local_placement)
+        return result, local_placement
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        future_to_position = {executor.submit(worker, x, 0): x for x in range(rows)}
+        futures = []
+        for domino in dominos:
+            if not domino.used:
+                if can_place(board, placement, domino, x, y, True):
+                    domino.used = True
+                    futures.append(executor.submit(try_place, domino, x, y, True))
+                    domino.used = False
+                if can_place(board, placement, domino, x, y, False):
+                    domino.used = True
+                    futures.append(executor.submit(try_place, domino, x, y, False))
+                    domino.used = False
 
-        for future in concurrent.futures.as_completed(future_to_position):
-            if future.result():
-                solution_found[0] = True
-                break
+        for future in concurrent.futures.as_completed(futures):
+            result, local_placement = future.result()
+            if result:
+                placement[:] = local_placement
+                return True
 
-    return solution_found[0]
+    return False
