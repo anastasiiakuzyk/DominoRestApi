@@ -1,6 +1,9 @@
+from itertools import permutations
 from models.domino import Domino
-from typing import List, Optional
+from typing import List, Optional, Tuple
 import random
+
+from services.database.database import save_board_to_db
 
 
 def generate_dominos(max_pips: int) -> List[Domino]:
@@ -11,24 +14,50 @@ def shuffle_dominos(dominos: List[Domino]):
     random.shuffle(dominos)
 
 
-def generate_board(rows: int, cols: int) -> List[List[int]]:
+def place_dominos_on_board(board: List[List[int]], dominos: List[Domino], domino_index: int) -> None:
+    rows = len(board)
+    cols = len(board[0])
+    for i in range(rows):
+        for j in range(0, cols, 2):
+            if domino_index >= len(dominos):
+                raise IndexError("Ran out of dominos to place on the board.")
+            board[i][j] = dominos[domino_index].side1
+            if j + 1 < cols:
+                board[i][j + 1] = dominos[domino_index].side2
+            domino_index += 1
+
+
+def generate_board(rows: int, cols: int) -> Tuple[List[List[int]], int]:
     max_pips = max(rows, cols) - 1
     dominos = generate_dominos(max_pips)
     shuffle_dominos(dominos)
     board = [[-1 for _ in range(cols)] for _ in range(rows)]
-
     domino_index = 0
-    for i in range(rows):
-        for j in range(0, cols, 2):
-            if domino_index >= len(dominos):
-                raise IndexError("Ran out of dominos while generating the board.")
-            domino = dominos[domino_index]
-            board[i][j] = domino.side1
-            if j + 1 < cols:
-                board[i][j + 1] = domino.side2
-            domino_index += 1
+    place_dominos_on_board(board, dominos, domino_index)
+    board_id = save_board_to_db(cols, rows, board)
+    return board, board_id
 
-    return board
+
+def generate_all_boards(rows: int, cols: int) -> List[int]:
+    max_pips = max(rows, cols) - 1
+    dominos = generate_dominos(max_pips)
+    unique_boards = set()
+    board_ids = []
+
+    for domino_permutation in permutations(dominos):
+        try:
+            board = [[-1 for _ in range(cols)] for _ in range(rows)]
+            domino_index = 0
+            place_dominos_on_board(board, list(domino_permutation), domino_index)
+            board_str = str(board)
+            if board_str not in unique_boards:
+                unique_boards.add(board_str)
+                board_id = save_board_to_db(cols, rows, board)
+                board_ids.append(board_id)
+        except IndexError:
+            continue  # Skip this permutation if it raises an IndexError
+
+    return board_ids
 
 
 def find_max_pips(board: List[List[int]]) -> int:
