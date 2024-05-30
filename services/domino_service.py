@@ -2,6 +2,7 @@ from itertools import permutations
 from models.domino import Domino
 from typing import List, Optional, Tuple
 import random
+import concurrent.futures
 
 from services.database.database import save_board_to_db
 
@@ -104,3 +105,22 @@ def solve_puzzle(board: List[List[int]], dominos: List[Domino], x: int = 0, y: i
                 placement[x][y], placement[x + 1][y] = None, None
                 domino.used = False
     return False
+
+
+def solve_puzzle_parallel(board: List[List[int]], dominos: List[Domino]) -> bool:
+    rows, cols = len(board), len(board[0])
+    placement = [[None for _ in range(cols)] for _ in range(rows)]
+    solution_found = [False]
+
+    def worker(x: int, y: int) -> bool:
+        return solve_puzzle(board, dominos, x, y, placement)
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future_to_position = {executor.submit(worker, x, 0): x for x in range(rows)}
+
+        for future in concurrent.futures.as_completed(future_to_position):
+            if future.result():
+                solution_found[0] = True
+                break
+
+    return solution_found[0]

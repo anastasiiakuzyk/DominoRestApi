@@ -1,3 +1,5 @@
+import time
+
 import pytest
 from fastapi import HTTPException
 from httpx import AsyncClient
@@ -8,7 +10,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from services.auth_service import get_current_user
 from services.database.database import get_board_by_id
 from services.domino_service import generate_dominos, shuffle_dominos, generate_board, solve_puzzle, find_max_pips, \
-    generate_all_boards
+    generate_all_boards, solve_puzzle_parallel
 from utils.printer import print_board_with_solution, print_dominos
 from unittest.mock import patch, MagicMock
 
@@ -96,11 +98,32 @@ def test_solve_puzzle_no_solution():
 
 
 def test_solve_puzzle_with_solution():
-    board, _ = generate_board(2, 4)  # Generate a 2x4 board
+    board, _ = generate_board(10, 10)
     max_pips = max(max(row) for row in board)
     dominos = generate_dominos(max_pips)
-    placement = [[None for _ in range(4)] for _ in range(2)]
+    placement = [[None for _ in range(10)] for _ in range(10)]
+    # start timer
+    start = time.time()
     solved = solve_puzzle(board, dominos, 0, 0, placement)
+    # end timer
+    end = time.time()
+    print(f"Solved in {end - start:.4f} seconds.")
+
+    assert solved
+
+
+def test_solve_puzzle_with_solution_parallel():
+    board, _ = generate_board(10, 10)
+    max_pips = max(max(row) for row in board)
+    dominos = generate_dominos(max_pips)
+    placement = [[None for _ in range(10)] for _ in range(10)]
+    # start timer
+    start = time.time()
+    solved = solve_puzzle_parallel(board, dominos)
+    # end timer
+    end = time.time()
+    print(f"Solved in {end - start:.4f} seconds.")
+
     assert solved
 
 
@@ -322,6 +345,7 @@ def test_generate_all_boards_no_duplicates():
         mock_place_dominos.assert_called()
         mock_save_board_to_db.assert_called()
         assert result == board_ids
+
 
 @pytest.mark.asyncio
 async def test_generate_all_boards_invalid_size():

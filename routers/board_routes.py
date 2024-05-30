@@ -2,7 +2,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from starlette.responses import PlainTextResponse
 from models.board import Board
 from services.database.database import get_board_by_id
-from services.domino_service import generate_board, generate_dominos, generate_all_boards, find_max_pips, solve_puzzle
+from services.domino_service import generate_board, generate_dominos, generate_all_boards, find_max_pips, solve_puzzle, \
+    solve_puzzle_parallel
 from utils.printer import print_board_with_solution, print_dominos
 from services.auth_service import get_current_user
 
@@ -36,7 +37,7 @@ async def solve_route(board: Board, user: str = Depends(get_current_user)):
     """
     dominos = generate_dominos(find_max_pips(board.board))
     placement = [[None for _ in range(len(board.board[0]))] for _ in range(len(board.board))]
-    solved = solve_puzzle(board.board, dominos, 0, 0, placement)
+    solved = solve_puzzle_parallel(board.board, dominos)
 
     solution_str = "Domino Board:\n"
     solution_str += print_board_with_solution(board.board, placement, False)
